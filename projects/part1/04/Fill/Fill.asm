@@ -9,7 +9,7 @@
 // the screen should be cleared.
 
     @color
-    M=1
+    M=0
 (LOOP)
     @KBD
     D=M
@@ -19,20 +19,20 @@
     @color
     D=M
     @FILL_WHITE
-    D;JEQ // if (color == 0) goto FILL_WHITE
+    D;JNE // if (color == 0) goto FILL_WHITE
 
     @LOOP
     0;JMP
 
 (FILL_BLACK)
     @color
-    M=0 // black + 1
+    M=-1 // black
     @FILL
     0;JMP
 
 (FILL_WHITE)
     @color
-    M=1 // white + 1
+    M=0 // white
     @FILL
     0;JMP
 
@@ -47,7 +47,7 @@
 
     @pos
     AM=M-1
-    M=D-1 // set color
+    M=D // set color
 
     D=A // *pos
     
