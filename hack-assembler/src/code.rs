@@ -78,7 +78,7 @@ impl Coder for Jump {
 impl Coder for Symbol {
     fn code(&self) -> String {
         let Symbol(value) = self;
-        format!("{:015b}", value)
+        format!("{value:015b}")
     }
 }
 
@@ -87,7 +87,7 @@ impl Coder for Value {
         match self {
             Value::Symbol(symbol) => symbol.code(),
             Value::Constant(constant) => {
-                format!("{:015b}", constant)
+                format!("{constant:015b}")
             }
         }
     }

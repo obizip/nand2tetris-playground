@@ -82,7 +82,7 @@ fn parse_instructions(
                     Value1st::Symbol(Symbol1st(symbol)) => match table.get(&symbol) {
                         Some(val) => Value::Symbol(Symbol(*val)),
                         None => {
-                            table.insert(symbol.clone(), var_idx.clone());
+                            table.insert(symbol.clone(), var_idx);
                             var_idx += 1;
                             Value::Symbol(Symbol(var_idx - 1))
                         }
@@ -223,7 +223,7 @@ impl Parser<Jump> for Jump {
 impl Parser<Symbol1st> for Symbol1st {
     fn parse(input: &str) -> ParseResult<Symbol1st> {
         let re = Regex::new(r"[A-Za-z\_\.\$\:]+[A-Za-z0-9\_\.\$\:]*").unwrap();
-        if !re.is_match(&input) {
+        if !re.is_match(input) {
             return Err(ParseError::InvalidSymbol(input.to_string()));
         }
 
@@ -233,7 +233,7 @@ impl Parser<Symbol1st> for Symbol1st {
 
 impl Parser<Value1st> for Value1st {
     fn parse(input: &str) -> ParseResult<Value1st> {
-        if input.chars().all(|c| c.is_digit(10)) {
+        if input.chars().all(|c| c.is_ascii_digit()) {
             return Ok(Value1st::Constant(
                 input.parse().expect("should be constant"),
             ));
@@ -258,7 +258,7 @@ fn parse_c_instruction(line: &str) -> ParseResult<Option<Instruction1st>> {
     let dest = if let Some(pos) = cur.find('=') {
         let dest = &cur[0..pos];
         cur = &cur[pos + 1..];
-        Destination::parse(&dest)?
+        Destination::parse(dest)?
     } else {
         Destination::Null
     };
@@ -266,12 +266,12 @@ fn parse_c_instruction(line: &str) -> ParseResult<Option<Instruction1st>> {
     let jump = if let Some(pos) = cur.find(';') {
         let jump = &cur[pos + 1..];
         cur = &cur[0..pos];
-        Jump::parse(&jump)?
+        Jump::parse(jump)?
     } else {
         Jump::Null
     };
 
-    let comp = Comparison::parse(&cur)?;
+    let comp = Comparison::parse(cur)?;
 
     let c_instruction = CInstruction::new(dest, comp, jump);
 
