@@ -1,0 +1,153 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/5/CPU.hdl
+/**
+ * The Hack Central Processing unit (CPU).
+ * Parses the binary code in the instruction input and executes it according to the
+ * Hack machine language specification. In the case of a C-instruction, computes the
+ * function specified by the instruction. If the instruction specifies to read a memory
+ * value, the inM input is expected to contain this value. If the instruction specifies
+ * to write a value to the memory, sets the outM output to this value, sets the addressM
+ * output to the target address, and asserts the writeM output (when writeM = 0, any
+ * value may appear in outM).
+ * If the reset input is 0, computes the address of the next instruction and sets the
+ * pc output to that value. If the reset input is 1, sets pc to 0.
+ * Note: The outM and writeM outputs are combinational: they are affected by the
+ * instruction's execution during the current cycle. The addressM and pc outputs are
+ * clocked: although they are affected by the instruction's execution, they commit to
+ * their new values only in the next cycle.
+ */
+
+/**
+ * CHIP ALU {
+ *     IN  
+ *         x[16], y[16],  // 16-bit inputs        
+ *         zx, // zero the x input?
+ *         nx, // negate the x input?
+ *         zy, // zero the y input?
+ *         ny, // negate the y input?
+ *         f,  // compute (out = x + y) or (out = x & y)?
+ *         no; // negate the out output?
+ *     OUT 
+ *         out[16], // 16-bit output
+ *         zr,      // if (out == 0) equals 1, else 0
+ *         ng;      // if (out < 0)  equals 1, else 0
+ */
+
+CHIP CPU {
+
+    IN  inM[16],         // M value input  (M = contents of RAM[A])
+        instruction[16], // Instruction for execution
+        reset;           // Signals whether to re-start the current
+                         // program (reset==1) or continue executing
+                         // the current program (reset==0).
+
+    OUT outM[16],        // M value output
+        writeM,          // Write to M? 
+        addressM[15],    // Address in data memory (of M)
+        pc[15];          // address of next instruction
+
+    PARTS:
+    // 左端が 0 のとき A 命令
+    // 左端が 1 のとき C 命令
+    Mux16(a=instruction, b=outALU, sel=instruction[15], out=toA);
+
+    // ARegister:
+    //   A 命令のとき、もしくは
+    //   C 命令のときに dest が A のとき
+    And(a=instruction[15], b=true, out=isC);
+    Not(in=isC, out=isA);
+    And(a=instruction[5], b=true, out=destIsA);
+    And(a=isC, b=destIsA, out=CAndDestIsA);
+    Or(a=isA, b=CAndDestIsA, out=loadA);
+    ARegister(in=toA, load=loadA, out=outA);
+
+    And16(a=outA, b=true, out[0..14]=addressM);
+
+    // ALU の入力:
+    //   ALU に M を入力するか A を入力するか
+    //   C 命令の a が１のとき M を入力する
+    //   A 命令のとき ALU を用いない?
+    Mux16(a=outA, b=inM, sel=instruction[12], out=toALU);
+
+    // DRegister:
+    //   C 命令かつ dest の右から 2bit 目が 1 のとき
+    And(a=isC, b=instruction[4], out=loadD);
+    DRegister(in=outALU, load=loadD, out=outD);
+
+    // ALU:
+    //   0: 0 + 0
+    //   1: ^(^0 + ^0)
+    //   -1: ^0 + 0
+    //   D: D & ^0
+    //   !D: ^(D & ^0)
+    //   -D: ^(D + ^0)
+    //   D+1: ^(^D + ^0)
+    //   D-1: D + ^0
+    //
+    //   zx: 
+    //     D レジスタの値を用いないとき
+    //     つまり c の左端が 1 のとき
+    //   nx: 
+    //   zy: 
+    //     A レジスタの値を用いないとき
+    //     つまり c の左から 3 番目が 1 のとき
+    //   nx: 
+    //   f: 
+    //     加減か論理積・論理和を求めるとき
+    //     つまり c の左から 5 番目が 1 のとき
+    //   no: 
+    //     否定か論理和のとき
+    ALU(
+        x=outD, 
+        y=toALU, 
+        zx=instruction[11], 
+        nx=instruction[10],
+        zy=instruction[9], 
+        ny=instruction[8],
+        f=instruction[7],
+        no=instruction[6],
+
+        out=outALU,
+        zr=zr,
+        ng=ng,
+    );
+
+    And16(a=outALU, b=true, out=outM);
+
+    // writeM:
+    //   C 命令で dest が M のと、つまり dest の右端が 1
+    And(a=isC, b=instruction[3], out=writeM);
+
+    // PC:
+    //   load:
+    //     C 命令で jump するとき
+    //   inc:
+    //     load が 0 のとき
+    Not(in=zr, out=notzr);
+    Not(in=ng, out=pos);
+    And(a=notzr, b=pos, out=isGT);
+    And(a=zr, b=true, out=isEQ);
+    Or(a=zr, b=pos, out=isGE);
+    And(a=notzr, b=ng, out=isLT);
+    And(a=notzr, b=true, out=isNE);
+    Or(a=zr, b=ng, out=isLE);
+    Mux8Way16(
+      a[0]=false, // null
+      b[0]=isGT,  // JGT
+      c[0]=isEQ,
+      d[0]=isGE,
+      e[0]=isLT,
+      f[0]=isNE,
+      g[0]=isLE,
+      h[0]=true,  // JMP
+      sel=instruction[0..2],
+      out[0]=jump,
+    );
+
+    And(a=isC, b=jump, out=loadPC);
+
+    Not(in=loadPC, out=incPC);
+    PC(in=outA, reset=reset, load=loadPC, inc=incPC, out[0..14]=pc);
+}
