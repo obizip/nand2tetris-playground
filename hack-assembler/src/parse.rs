@@ -45,8 +45,6 @@ fn insert_default_values(table: &mut SymbolTable) {
 pub enum ParseError {
     #[error("invalid symbol `{0}`")]
     InvalidSymbol(String),
-    // #[error("value is empty")]
-    // EmptyValue,
     #[error("invalid comparison `{0}`")]
     InvalidComparison(String),
     #[error("invalid destination `{0}`")]
@@ -55,8 +53,6 @@ pub enum ParseError {
     InvalidJump(String),
     #[error("invalid instruction `{0}`")]
     InvalidInstruction(String),
-    // #[error("label must be symbol `{0}`")]
-    // LabelMustBeSymbol(usize),
 }
 
 pub fn parse_lines(lines: Vec<String>) -> ParseResult<Vec<Instruction>> {
@@ -128,10 +124,6 @@ fn parse_lines_1st(lines: Vec<String>) -> ParseResult<(Vec<Instruction1st>, Symb
     }
     Ok((instructions, table))
 }
-
-// fn parse_lines_2nd(lines: Vec<Instruction1st>) -> ParseResult<Vec<Instruction>> {
-//     let mut instructions = Vec::new();
-// }
 
 pub trait Parser<T> {
     fn parse(input: &str) -> ParseResult<T>;
